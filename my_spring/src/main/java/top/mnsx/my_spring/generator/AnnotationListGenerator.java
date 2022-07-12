@@ -1,7 +1,5 @@
 package top.mnsx.my_spring.generator;
 
-import top.mnsx.my_spring.exception.UrlNotFoundException;
-
 import java.io.File;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
@@ -32,7 +30,7 @@ public class AnnotationListGenerator {
                     fileName = fileName.substring(index + 8, fileName.length() - 6);
                     fileName = fileName.replace(File.separator, ".");
                     Class<?> c  = Class.forName(fileName);
-                    annotationList.add(c);
+                    annotationList.add((Class<? extends Annotation>) c);
                 }
             }
         } catch (IOException | ClassNotFoundException e) {

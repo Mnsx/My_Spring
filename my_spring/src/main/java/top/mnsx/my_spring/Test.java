@@ -1,6 +1,7 @@
 package top.mnsx.my_spring;
 
 import top.mnsx.my_spring.container.ClassPathXmlApplicationContext;
+import top.mnsx.my_spring.template.service.OrderService;
 
 /**
  * @BelongsProject: my_sprint
@@ -11,5 +12,6 @@ import top.mnsx.my_spring.container.ClassPathXmlApplicationContext;
 public class Test {
     public static void main(String[] args) {
         ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
+        System.out.println(context.getBeans(OrderService.class));
     }
 }

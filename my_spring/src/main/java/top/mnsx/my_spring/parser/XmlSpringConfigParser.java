@@ -21,7 +21,7 @@ public class XmlSpringConfigParser {
         String basePackage = "";
 
         SAXReader reader = new SAXReader();
-        InputStream inputStream = XmlSpringConfigParser.class.getClassLoader().getResourceAsStream(springConfig);
+        InputStream inputStream = Thread.currentThread().getContextClassLoader().getResourceAsStream(springConfig);
         try {
             Document document = reader.read(inputStream);
             Element rootElement = document.getRootElement();

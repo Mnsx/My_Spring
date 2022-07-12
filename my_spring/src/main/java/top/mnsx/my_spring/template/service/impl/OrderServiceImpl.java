@@ -1,13 +1,14 @@
 package top.mnsx.my_spring.template.service.impl;
 
-import org.springframework.stereotype.Service;
+import top.mnsx.my_spring.annotation.bean.Component;
+import top.mnsx.my_spring.annotation.bean.Service;
 import top.mnsx.my_spring.template.service.OrderService;
 import top.mnsx.my_spring.template.entity.Order;
 
 import java.util.ArrayList;
 import java.util.List;
 
-@Service
+@Component("test")
 public class OrderServiceImpl implements OrderService {
     @Override
     public List<Order> findOrders() {
