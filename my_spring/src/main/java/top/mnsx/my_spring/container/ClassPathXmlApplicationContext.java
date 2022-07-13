@@ -1,5 +1,7 @@
 package top.mnsx.my_spring.container;
 
+import top.mnsx.my_spring.annotation.Around;
+import top.mnsx.my_spring.annotation.Aspect;
 import top.mnsx.my_spring.annotation.Autowired;
 import top.mnsx.my_spring.annotation.Qualifier;
 import top.mnsx.my_spring.annotation.bean.Component;
@@ -12,9 +14,11 @@ import top.mnsx.my_spring.parser.XmlSpringConfigParser;
 import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 /**
  * @BelongsProject: my_sprint
@@ -38,6 +42,9 @@ public class ClassPathXmlApplicationContext {
 
     //Spring中接口容器
     private Map<Class<?>, List<Object>> iocInterfacesContainer = new ConcurrentHashMap<>();
+
+    //存储切面类的集合
+    private Set<Class<?>> aopClasses = new CopyOnWriteArraySet<>();
 
     public ClassPathXmlApplicationContext(String springConfig) {
         this.springConfig = springConfig;
@@ -89,8 +96,44 @@ public class ClassPathXmlApplicationContext {
         this.loadClasses(basePackage);
         //执行类的初始化
         this.doInitInstance();
+        //实现AOP，创建代理对象
+        this.doAop();
         //实现对象的依赖注入
         this.doInjection();
+    }
+
+    /**
+     * 执行Aop操作，创建代理对象
+     */
+    private void doAop() {
+        if (aopClasses.size() > 0) {
+            try {
+                for (Class<?> aopClass : aopClasses) {
+                    Method[] declaredMethods = aopClass.getDeclaredMethods();
+                    if (declaredMethods.length > 0) {
+                        for (Method method : declaredMethods) {
+                            boolean annotationPresent = method.isAnnotationPresent(Around.class);
+                            if (annotationPresent) {
+                                Around around = method.getAnnotation(Around.class);
+                                //获取切入点表达式
+                                String execution = around.execution();
+
+                                String fullClass = execution.substring(0, execution.lastIndexOf("."));
+                                String proxyMethod = execution.substring(execution.lastIndexOf(".") + 1);
+
+                                Class<?> targetClass = Class.forName(fullClass);
+                                Object targetObject = iocClassContainer.get(targetClass);
+
+
+                            }
+
+                        }
+                    }
+                }
+            } catch (ClassNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     /**
@@ -156,6 +199,14 @@ public class ClassPathXmlApplicationContext {
         for (String classPath : classPaths) {
             try {
                 Class<?> c = Class.forName(classPath);
+
+                //判断那些类需要进行AOP操作
+                if (c.isAnnotationPresent(Aspect.class)) {
+                    aopClasses.add(c);
+                    continue;
+                }
+
+                //判断是否需要被加入IOC容器
                 List<Class<? extends Annotation>> annotationList = AnnotationListGenerator.getAnnotationList();
 
                 for (Class<? extends Annotation> annotation : annotationList) {

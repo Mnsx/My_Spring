@@ -7,6 +7,8 @@ import top.mnsx.my_spring.template.entity.Order;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @Component("test")
 public class OrderServiceImpl implements OrderService {
@@ -16,6 +18,7 @@ public class OrderServiceImpl implements OrderService {
         orders.add(new Order(111, "电子产品", "2020-10-10", 3000));
         orders.add(new Order(112, "图书产品", "2020-10-10", 3000));
         orders.add(new Order(113, "运动产品", "2020-10-10", 8888));
+        Logger.getGlobal().log(Level.INFO, "order添加成功");
         return orders;
     }
 }

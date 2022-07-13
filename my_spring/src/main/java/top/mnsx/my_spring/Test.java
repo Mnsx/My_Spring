@@ -12,6 +12,7 @@ import top.mnsx.my_spring.template.service.OrderService;
 public class Test {
     public static void main(String[] args) {
         ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("applicationContext.xml");
-        System.out.println(context.getBeans(OrderService.class));
+        OrderService orderService = (OrderService) context.getBeans("test").get(0);
+        orderService.findOrders();
     }
 }
