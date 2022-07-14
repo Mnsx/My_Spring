@@ -6,10 +6,12 @@ import top.mnsx.my_spring.annotation.Autowired;
 import top.mnsx.my_spring.annotation.Qualifier;
 import top.mnsx.my_spring.annotation.bean.Component;
 import top.mnsx.my_spring.annotation.bean.Controller;
+import top.mnsx.my_spring.annotation.bean.Repository;
 import top.mnsx.my_spring.annotation.bean.Service;
 import top.mnsx.my_spring.exception.*;
 import top.mnsx.my_spring.generator.AnnotationListGenerator;
 import top.mnsx.my_spring.parser.XmlSpringConfigParser;
+import top.mnsx.my_spring.proxy.JdkProxy;
 
 import java.io.File;
 import java.lang.annotation.Annotation;
@@ -45,6 +47,9 @@ public class ClassPathXmlApplicationContext {
 
     //存储切面类的集合
     private Set<Class<?>> aopClasses = new CopyOnWriteArraySet<>();
+
+    //要被动态代理的类
+    private Set<Class<?>> proxyClassSet = new CopyOnWriteArraySet<>();
 
     public ClassPathXmlApplicationContext(String springConfig) {
         this.springConfig = springConfig;
@@ -122,9 +127,71 @@ public class ClassPathXmlApplicationContext {
                                 String proxyMethod = execution.substring(execution.lastIndexOf(".") + 1);
 
                                 Class<?> targetClass = Class.forName(fullClass);
+                                proxyClassSet.add(targetClass);
+
                                 Object targetObject = iocClassContainer.get(targetClass);
 
+                                //生成代理类之前先注入依赖
+                                doInjectionByOneClass(targetClass);
 
+                                //生成代理类
+                                JdkProxy jdkProxy = new JdkProxy(targetClass, aopClass, targetObject, proxyMethod, method);
+                                Object proxyInstance = jdkProxy.getProxyInstance();
+
+                                //替换由类查找的容器
+                                iocClassContainer.put(targetClass, proxyInstance);
+
+                                //替换由名字查找的容器
+                                String simpleName = targetClass.getSimpleName();
+                                String className = String.valueOf(simpleName.charAt(0)).toUpperCase() + simpleName.substring(1);
+                                Service service = targetClass.getAnnotation(Service.class);
+                                Controller controller = targetClass.getAnnotation(Controller.class);
+                                Component component = targetClass.getAnnotation(Component.class);
+                                Repository repository = targetClass.getAnnotation(Repository.class);
+
+                                String value = "";
+                                if (controller != null) {
+                                    value = controller.value();
+                                } else if (service != null) {
+                                    value = service.value();
+                                } else if (component != null) {
+                                    value = component.value();
+                                } else if (repository != null) {
+                                    value = repository.value();
+                                }
+
+                                if (!"".equals(value)) {
+                                    className = value;
+                                }
+
+                                List<Object> objects = iocNameContainer.get(className);
+                                if (objects != null) {
+                                    for (int i = 0; i < objects.size(); ++i) {
+                                        Object o = objects.get(i);
+                                        if (o.getClass() == targetClass) {
+                                            objects.set(i, proxyInstance);
+                                        }
+                                    }
+                                }
+                                iocNameContainer.put(className, objects);
+
+                                //替换接口容器中数据
+                                Class<?>[] interfaces = targetClass.getInterfaces();
+                                if (interfaces != null) {
+                                    for (Class<?> anInterface : interfaces) {
+                                        List<Object> obj = iocInterfacesContainer.get(anInterface);
+                                        if (obj != null) {
+                                            for (int i = 0; i < obj.size(); ++i) {
+                                                Object o = obj.get(i);
+                                                if (o.getClass() == targetClass) {
+                                                    obj.set(i, proxyInstance);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        iocInterfacesContainer.put(anInterface, obj);
+                                    }
+                                }
                             }
 
                         }
@@ -143,36 +210,49 @@ public class ClassPathXmlApplicationContext {
         Set<Class<?>> classes = iocClassContainer.keySet();
         if (!classes.isEmpty()) {
             for (Class<?> aClass : classes) {
-                Field[] declaredFields = aClass.getDeclaredFields();
-                if (declaredFields.length != 0) {
-                    for (Field field : declaredFields) {
-                        Object o = null;
-                        boolean flag = false;
-                        boolean annoAutowired = field.isAnnotationPresent(Autowired.class);
-                        boolean annoQualifier = field.isAnnotationPresent(Qualifier.class);
-                        if (annoQualifier) {
-                            Qualifier qualifier = field.getAnnotation(Qualifier.class);
-                            String value = qualifier.value();
-                            if (!"".equals(value)) {
-                                List<Object> beans = this.getBeans(value);
-                                if (beans.size() == 1) {
-                                    o = beans.get(0);
-                                    flag = true;
-                                }
+                if (!proxyClassSet.contains(aClass)) {
+                    doInjectionByOneClass(aClass);
+                }
+            }
+        }
+    }
+
+    private void doInjectionByOneClass(Class<?> aClass) {
+        Field[] declaredFields = aClass.getDeclaredFields();
+        if (declaredFields.length != 0) {
+            for (Field field : declaredFields) {
+                Object o = null;
+                boolean flag = false;
+                boolean annoAutowired = field.isAnnotationPresent(Autowired.class);
+                boolean annoQualifier = field.isAnnotationPresent(Qualifier.class);
+                if (annoQualifier) {
+                    Qualifier qualifier = field.getAnnotation(Qualifier.class);
+                    String value = qualifier.value();
+                    if (!"".equals(value)) {
+                        List<Object> beans = this.getBeans(value);
+                        if (beans.size() == 1) {
+                            o = beans.get(0);
+                            flag = true;
+                        } else {
+                            o = this.findBeanByType(field, annoAutowired);
+                            if (o == null) {
+                                throw new NotFoundBeanMatchConditionException("没有找到满足适配条件的bean");
                             }
                         }
-                        if (!flag) {
-                            o = this.findBeanByType(field, annoAutowired);
-                        }
-                        //对象匹配到之后，通过反射，注入给属性
-                        field.setAccessible(true);
-                        //反射属性赋值
-                        try {
-                            field.set(iocClassContainer.get(aClass), o);
-                        } catch (IllegalAccessException e) {
-                            e.printStackTrace();
-                        }
                     }
+                } else if (annoAutowired) {
+                    o = this.findBeanByType(field, true);
+                    if (o == null) {
+                        throw new NotFoundBeanMatchConditionException("没有找到满足适配条件的bean");
+                    }
+                }
+                //对象匹配到之后，通过反射，注入给属性
+                field.setAccessible(true);
+                //反射属性赋值
+                try {
+                    field.set(iocClassContainer.get(aClass), o);
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
                 }
             }
         }
@@ -187,9 +267,8 @@ public class ClassPathXmlApplicationContext {
     private Object findBeanByType(Field field, boolean annoAutowired) {
         if (annoAutowired) {
             return this.getBean(field.getType()) != null ? this.getBean(field.getType()) : this.getBeans(field.getType());
-        } else {
-            throw new NotFoundBeanMatchConditionException("没有找到满足适配条件的bean");
         }
+        return null;
     }
 
     /**
@@ -232,6 +311,7 @@ public class ClassPathXmlApplicationContext {
                         Controller controllerAnnotation = c.getAnnotation(Controller.class);
                         Service serviceAnnotation = c.getAnnotation(Service.class);
                         Component componentAnnotation = c.getAnnotation(Component.class);
+                        Repository repositoryAnnotation = c.getAnnotation(Repository.class);
 
                         String value = "";
                         if (controllerAnnotation != null) {
@@ -240,6 +320,8 @@ public class ClassPathXmlApplicationContext {
                             value = serviceAnnotation.value();
                         } else if (componentAnnotation != null) {
                             value = componentAnnotation.value();
+                        } else if (repositoryAnnotation != null) {
+                            value = repositoryAnnotation.value();
                         }
                         String objName = "";
                         if ("".equals(value)) {

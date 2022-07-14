@@ -8,6 +8,10 @@ import org.dom4j.io.SAXReader;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 /**
  * @BelongsProject: my_sprint
@@ -16,6 +20,25 @@ import java.io.InputStream;
  * @Description: XML解析工具
  */
 public class XmlSpringConfigParser {
+    public static Map<String, String> getDataSource(String springConfig) {
+        Map<String, String> result = new HashMap<>();   
+        
+        SAXReader reader = new SAXReader();
+        InputStream inputstream = Thread.currentThread().getContextClassLoader().getResourceAsStream(springConfig);
+        try {
+            Document document = reader.read(inputstream);
+            Element rootElement = document.getRootElement();
+            Element datasource = rootElement.element("datasource");
+            Iterator properties = datasource.elementIterator("property");
+            while (properties.hasNext()) {
+                Element property = (Element) properties.next();
+                result.put(property.attributeValue("name"), property.attributeValue("value"));
+            }
+        } catch (DocumentException e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
 
     public static String getBasePackage(String springConfig) {
         String basePackage = "";

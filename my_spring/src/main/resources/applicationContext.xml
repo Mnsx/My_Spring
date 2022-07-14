@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <beans>
     <component-scan base-package="top.mnsx.my_spring.template"/>
+    <datasource>
+        <property name="driver" value="com.mysql.cj.jdbc.Driver"/>
+        <property name="url" value="jdbc:mysql://localhost:3306/my_spring?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=UTC"/>
+        <property name="name" value="root"/>
+        <property name="password" value="123123"/>
+    </datasource>
 </beans>

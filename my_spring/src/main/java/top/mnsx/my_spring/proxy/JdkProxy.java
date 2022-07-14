@@ -23,15 +23,15 @@ public class JdkProxy {
                 targetClass.getInterfaces(),
                     (proxy, method, args) -> {
                         if (method.getName().equals(methodName)) {
-                            ProceedingJoinPoint proceedingJoinPoint = new ProceedingJoinPoint(method, targetClass, args);
-                            aopMethod.invoke(aopClass.newInstance(), proceedingJoinPoint);
+                            ProceedingJoinPoint proceedingJoinPoint = new ProceedingJoinPoint(method, targetClass.newInstance(), args);
+                            return aopMethod.invoke(aopClass.newInstance(), proceedingJoinPoint);
                         } else {
-                            method.invoke(targetObject, args);
+                            return method.invoke(targetObject, args);
                         }
         });
     }
 
-    private JdkProxy(Class<?> targetClass, Class<?> aopClass, Object targetObject, String methodName, Method aopMethod) {
+    public JdkProxy(Class<?> targetClass, Class<?> aopClass, Object targetObject, String methodName, Method aopMethod) {
         this.targetClass = targetClass;
         this.aopClass = aopClass;
         this.targetObject = targetObject;

@@ -13,7 +13,6 @@ import top.mnsx.my_spring.aop.ProceedingJoinPoint;
 @Aspect
 public class LogAop {
 
-    @Around(execution = "top.mnsx.my_spring.template.service.impl.OrderServiceImpl.findOrders")
     public Object around(ProceedingJoinPoint joinPoint) {
         Object result = null;
         try {
