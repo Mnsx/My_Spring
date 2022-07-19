@@ -1,23 +1,23 @@
 package top.mnsx.my_spring.container;
 
-import top.mnsx.my_spring.annotation.Around;
-import top.mnsx.my_spring.annotation.Aspect;
-import top.mnsx.my_spring.annotation.Autowired;
-import top.mnsx.my_spring.annotation.Qualifier;
+import top.mnsx.my_spring.annotation.*;
 import top.mnsx.my_spring.annotation.bean.Component;
 import top.mnsx.my_spring.annotation.bean.Controller;
 import top.mnsx.my_spring.annotation.bean.Repository;
 import top.mnsx.my_spring.annotation.bean.Service;
 import top.mnsx.my_spring.exception.*;
 import top.mnsx.my_spring.generator.AnnotationListGenerator;
+import top.mnsx.my_spring.jdbc.TransactionManager;
 import top.mnsx.my_spring.parser.XmlSpringConfigParser;
 import top.mnsx.my_spring.proxy.JdkProxy;
+import top.mnsx.my_spring.transaction.TransactionProxy;
 
 import java.io.File;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
+import java.sql.Connection;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
@@ -63,11 +63,7 @@ public class ClassPathXmlApplicationContext {
      */
     public Object getBeans(Class<?> c) {
         List<Object> objects = iocInterfacesContainer.get(c);
-        if (objects.size() == 1) {
-            return objects.get(0);
-        } else {
-            throw new ToMuchBeanException("存在多个bean匹配接口");
-        }
+        return objects.get(0);
     }
 
     /**
@@ -99,6 +95,7 @@ public class ClassPathXmlApplicationContext {
         String basePackage = XmlSpringConfigParser.getBasePackage(springConfig);
         //加载所有类
         this.loadClasses(basePackage);
+        this.loadClasses("top.mnsx.my_spring");
         //执行类的初始化
         this.doInitInstance();
         //实现AOP，创建代理对象
@@ -292,6 +289,23 @@ public class ClassPathXmlApplicationContext {
                     if (c.isAnnotationPresent(annotation)) {
                         Object o = c.newInstance();
 
+                        //判断这个类是否需要进行事务管理
+                        Method[] declaredMethods = c.getDeclaredMethods();
+                        List<String> transactionalMethods = new ArrayList<>();
+                        if (declaredMethods.length != 0) {
+                            for (Method method : declaredMethods) {
+                                boolean annotationPresent = method.isAnnotationPresent(Transactional.class);
+                                if (annotationPresent) {
+                                    transactionalMethods.add(method.getName());
+                                }
+                            }
+                        }
+                        //如果类的方法声明了Transactional注解，那么提供事务管理
+                        if (transactionalMethods.size() > 0) {
+                            TransactionProxy transactionProxy = new TransactionProxy(c, transactionalMethods);
+                            o = transactionProxy.getProxyInstance();
+                        }
+
                         Class<?>[] interfaces = c.getInterfaces();
                         if (interfaces.length != 0) {
                             for (Class<?> aInterface : interfaces) {
@@ -342,8 +356,6 @@ public class ClassPathXmlApplicationContext {
                 }
             } catch (ClassNotFoundException | InstantiationException | IllegalAccessException e) {
                 e.printStackTrace();
-            } finally {
-
             }
         }
     }

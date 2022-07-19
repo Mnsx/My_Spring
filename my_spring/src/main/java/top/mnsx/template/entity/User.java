@@ -1,4 +1,4 @@
-package top.mnsx.my_spring.template.entity;
+package top.mnsx.template.entity;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

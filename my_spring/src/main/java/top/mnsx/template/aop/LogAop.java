@@ -1,4 +1,4 @@
-package top.mnsx.my_spring.template.aop;
+package top.mnsx.template.aop;
 
 import top.mnsx.my_spring.annotation.Around;
 import top.mnsx.my_spring.annotation.Aspect;
@@ -10,7 +10,6 @@ import top.mnsx.my_spring.aop.ProceedingJoinPoint;
  * @CreateTime: 2022/7/13
  * @Description:
  */
-@Aspect
 public class LogAop {
 
     public Object around(ProceedingJoinPoint joinPoint) {
